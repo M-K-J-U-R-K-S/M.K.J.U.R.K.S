@@ -138,11 +138,56 @@ export function renderNavbar(current) {
             text: 'Workout plans, logs, recommendations, and calorie information are for general information only and are not medical, fitness, or nutrition advice. Talk to a qualified professional before starting a new exercise program, and stop if something hurts.'
           }),
           el('p', {},
-            el('a', { href: 'privacy.html', text: 'Privacy Policy' }), ' · ',
-            el('a', { href: 'terms.html', text: 'Terms of Use' }),
+            el('a', { href: 'privacy.html', text: 'Privacy Policy', 'data-legal': 'Privacy Policy' }), ' · ',
+            el('a', { href: 'terms.html', text: 'Terms of Use', 'data-legal': 'Terms of Use' }),
             ' · Pump Check is a student demo project.'))));
   }
 
   // Show the username; a failure here is not worth an error message
   api.me().then(user => { userLabel.textContent = user.username; }).catch(() => {});
 }
+// ---- Pop-up for the Privacy Policy and Terms of Use ----
+let legalDialog = null;
+let legalFrame = null;
+let legalHeading = null;
+
+function openLegal(href, title) {
+  if (!legalDialog) {
+    legalHeading = el('h2', { id: 'legal-dialog-title', style: 'margin: 0; font-size: 1.1rem;' });
+    legalFrame = el('iframe', {
+      title: 'Legal document',
+      style: 'flex: 1; width: 100%; border: 0; background: #0b0f17;'
+    });
+    legalDialog = el('dialog', {
+      'aria-labelledby': 'legal-dialog-title',
+      style: 'width: min(760px, calc(100% - 2rem)); height: min(80vh, 720px); padding: 0; overflow: hidden;'
+    },
+      el('div', { style: 'display: flex; flex-direction: column; height: 100%;' },
+        el('div', {
+          style: 'display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);'
+        },
+          legalHeading,
+          el('button', {
+            class: 'btn btn-secondary btn-small', type: 'button', text: 'Close',
+            onclick: () => legalDialog.close()
+          })),
+        legalFrame));
+    // Clicking the dark area outside the window closes it
+    legalDialog.addEventListener('click', event => {
+      if (event.target === legalDialog) legalDialog.close();
+    });
+    legalDialog.addEventListener('close', () => legalFrame.removeAttribute('src'));
+    document.body.append(legalDialog);
+  }
+  legalHeading.textContent = title;
+  legalFrame.setAttribute('src', href);
+  legalDialog.showModal();
+}
+
+// Any link with a data-legal attribute opens in the pop-up instead of a new page
+document.addEventListener('click', event => {
+  const link = event.target.closest && event.target.closest('a[data-legal]');
+  if (!link || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  event.preventDefault();
+  openLegal(link.getAttribute('href'), link.dataset.legal);
+});
