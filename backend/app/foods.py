@@ -138,6 +138,12 @@ def grams_per_unit(food, unit):
         amount, grams = Decimal(str(portion.get("amount", 0))), Decimal(str(portion.get("gramWeight", 0)))
         if amount.is_finite() and grams.is_finite() and amount > 0 and grams > 0:
             return grams / amount
+    if unit == "serving":
+        # No labeled serving: use USDA's first listed household portion (e.g. "1 medium apple").
+        for portion in food.get("foodPortions", []):
+            amount, grams = Decimal(str(portion.get("amount", 0))), Decimal(str(portion.get("gramWeight", 0)))
+            if amount.is_finite() and grams.is_finite() and amount > 0 and grams > 0:
+                return grams / amount
     raise HTTPException(400, "No conversion for this portion unit; use g or oz")
 
 

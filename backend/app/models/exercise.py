@@ -16,3 +16,4 @@ class Exercise(Base):
     sets = Column(Integer)
     reps = Column(Integer)
     required_equipment = Column(ARRAY(Text))
+    position = Column(Integer, nullable=False, default=0)

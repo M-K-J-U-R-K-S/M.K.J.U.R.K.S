@@ -60,6 +60,7 @@ export function createApi({ baseUrl = 'http://127.0.0.1:8000', storage = globalT
     publicPlans: filters => request('/api/workout-plans' + query(filters)),
     plan: planId => request(`/api/workout-plans/${id(planId)}`),
     createPlan: body => request('/api/workout-plans', { method: 'POST', body }),
+        suggestPlan: description => request('/api/workout-plans/suggest', { method: 'POST', body: { description } }),
     updatePlan: (planId, body) => request(`/api/workout-plans/${id(planId)}`, { method: 'PUT', body }),
     deletePlan: planId => request(`/api/workout-plans/${id(planId)}`, { method: 'DELETE' }),
     savePlan: planId => request(`/api/workout-plans/${id(planId)}/save`, { method: 'POST' }),

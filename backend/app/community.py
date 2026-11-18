@@ -4,7 +4,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
+from pydantic import BaseModel, ConfigDict, Field
 
+from app import ai_recommend
 from app.auth import get_current_user, get_profile
 from app.database import get_db
 from app.models import Equipment, Exercise, Gym, Plan, SavedPlan, User
@@ -22,7 +24,7 @@ def serialize_plans(db, plans, authors=False):
     if not plans:
         return []
     exercises = db.scalars(select(Exercise).where(Exercise.plan_id.in_([p.id for p in plans]))
-                          .order_by(Exercise.id)).all()
+                          .order_by(Exercise.position, Exercise.id)).all()
     users = dict(db.execute(select(User.id, User.username).where(
         User.id.in_([p.user_id for p in plans]))).all()) if authors else {}
     grouped = {}
@@ -101,8 +103,25 @@ def recommendations(goal: str | None = Query(None, max_length=200),
         raise HTTPException(400, "Provide a goal or a muscle group")
     query = select(Plan).where(or_(Plan.is_public.is_(True), Plan.user_id == UUID(identity["id"])))
     plans = db.scalars(filter_plans(query, goal, muscle_group).order_by(Plan.name, Plan.id).limit(20)).all()
-    return {"plans": serialize_plans(db, plans)}
+    results = serialize_plans(db, plans)
+    order = ai_recommend.rank_plans(results, goal, muscle_group)  # None = keep the normal order
+    if order:
+        by_id = {str(plan["id"]): plan for plan in results}
+        results = [by_id[plan_id] for plan_id in order]
+    return {"plans": results}
 
+class PlanIdea(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    description: str = Field(min_length=1, max_length=500)
+
+
+@router.post("/api/workout-plans/suggest")
+def suggest_workout_plan(body: PlanIdea, identity: dict = Depends(get_current_user)):
+    """AI draft plan for a description. Nothing is saved until the user saves it."""
+    description = body.description.strip()
+    if not description:
+        raise HTTPException(400, "Describe the workout you want")
+    return ai_recommend.suggest_plan(description)
 
 def equipment_status(required, equipment):
     unavailable, unknown = [], []
@@ -123,7 +142,7 @@ def compatibility(gym_id: UUID, plan_id: UUID, identity: dict = Depends(get_curr
         raise HTTPException(404, "Gym not found")
     plan = find_plan(db, plan_id, identity["id"])
     equipment = {normalize(e.name): e for e in db.scalars(select(Equipment).where(Equipment.gym_id == gym_id))}
-    exercises = db.scalars(select(Exercise).where(Exercise.plan_id == plan.id).order_by(Exercise.id)).all()
+    exercises = db.scalars(select(Exercise).where(Exercise.plan_id == plan.id).order_by(Exercise.position, Exercise.id)).all()
     candidates = db.scalars(select(Exercise).join(Plan, Plan.id == Exercise.plan_id).where(
         or_(Plan.is_public.is_(True), Plan.user_id == UUID(identity["id"])))
         .order_by(Exercise.name, Exercise.id)).all()

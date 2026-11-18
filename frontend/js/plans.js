@@ -69,6 +69,26 @@ function init() {
   document.getElementById('add-exercise').addEventListener('click', () => addRow());
   document.getElementById('cancel-form').addEventListener('click', closeForm);
 
+  
+  // ---------- AI plan idea ----------
+  const aiButton = document.getElementById('ai-suggest');
+  aiButton.addEventListener('click', async () => {
+    clearMessage();
+    const description = document.getElementById('ai-description').value.trim();
+    if (!description) return showError('Describe the workout you want first.');
+    await withBusy(aiButton, async () => {
+      try {
+        const draft = await api.suggestPlan(description);
+        openForm(draft);
+        editingId = null; // a new plan, not an edit
+        document.getElementById('form-title').textContent = 'New plan (AI draft: review before saving)';
+        showSuccess('Here is a draft. Edit anything you like, then click Save plan.');
+      } catch (error) {
+        showError(error.message);
+      }
+    });
+  });
+
   // ---------- Save ----------
   form.addEventListener('submit', async event => {
     event.preventDefault();

@@ -47,7 +47,9 @@ create table exercises (
   muscle_group text,
   sets integer check (sets > 0),
   reps integer check (reps > 0),
-  required_equipment text[]
+  required_equipment text[],
+  position integer not null default 0
+);
 );
 
 create table workout_logs (

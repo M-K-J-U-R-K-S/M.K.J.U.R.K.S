@@ -80,7 +80,8 @@ def find_plan(db, plan_id, user_id, *, owner_only=False, lock=False):
 
 
 def add_exercises(db, plan_id, exercises):
-    rows = [Exercise(plan_id=plan_id, **exercise.model_dump()) for exercise in exercises]
+    rows = [Exercise(plan_id=plan_id, position=index, **exercise.model_dump())
+            for index, exercise in enumerate(exercises)]
     db.add_all(rows)
     db.flush()
     return rows
@@ -110,7 +111,7 @@ def my_plans(identity: dict = Depends(get_current_user), db: Session = Depends(g
     grouped = defaultdict(list)
     if plans:
         exercises = db.scalars(select(Exercise).where(Exercise.plan_id.in_([p.id for p in plans]))
-                              .order_by(Exercise.id)).all()
+                              .order_by(Exercise.position, Exercise.id)).all()
         for exercise in exercises:
             grouped[exercise.plan_id].append(exercise)
     return {"plans": [plan_response(plan, grouped[plan.id]) for plan in plans]}
@@ -121,7 +122,7 @@ def get_plan(plan_id: UUID, identity: dict = Depends(get_current_user),
              db: Session = Depends(get_db)):
     plan = find_plan(db, plan_id, identity["id"])
     exercises = db.scalars(select(Exercise).where(Exercise.plan_id == plan.id)
-                          .order_by(Exercise.id)).all()
+                          .order_by(Exercise.position, Exercise.id)).all()
     return plan_response(plan, exercises)
 
 
