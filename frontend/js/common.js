@@ -5,7 +5,9 @@ const LOGIN_PAGE = 'login.html';
 
 // One API client for every page. Change baseUrl when the backend is deployed.
 export const api = createApi({
-  baseUrl: 'http://127.0.0.1:8000',
+    baseUrl: ['127.0.0.1', 'localhost'].includes(window.location.hostname)
+    ? 'http://127.0.0.1:8000'
+    : 'https://pump-check-api.onrender.com',
   onUnauthorized: () => { window.location.href = LOGIN_PAGE; }
 });
 
