@@ -1,5 +1,8 @@
 import logging
 
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -73,3 +76,8 @@ def health_check():
 def db_health_check(db: Session = Depends(get_db)):
     db.execute(text("SELECT 1"))
     return {"status": "database connected"}
+
+# Serve the website from the same server, so one deploy runs everything
+FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+if FRONTEND_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
