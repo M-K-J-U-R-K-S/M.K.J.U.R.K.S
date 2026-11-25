@@ -1,6 +1,6 @@
 import {
   api, requireLogin, renderNavbar, el,
-  showError, showSuccess, clearMessage, withBusy
+  showError, showSuccess, clearMessage, withBusy, safeWebsite
 } from './common.js?v=merged-5';
 import { compressImage } from './image-utils.js';
 
@@ -33,6 +33,7 @@ function availabilityClass(availability) {
 function start() {
   const nameEl = document.getElementById('gym-name');
   const addressEl = document.getElementById('gym-address');
+  const websiteEl = document.getElementById('gym-website');
   const ratingEl = document.getElementById('gym-rating');
   const equipmentList = document.getElementById('equipment-list');
   const equipmentForm = document.getElementById('equipment-form');
@@ -182,6 +183,11 @@ function start() {
     nameEl.textContent = gym.name;
     addressEl.textContent = gym.address || 'Address not listed';
 
+    const website = safeWebsite(gym.website);
+    websiteEl.replaceChildren(...(website ? [el('a', {
+      href: website, target: '_blank', rel: 'noopener noreferrer', text: 'Visit gym website ↗',
+      'aria-label': `${gym.name} website (opens in a new tab)` })] : []));
+
     if (gym.average_rating === null || gym.average_rating === undefined) {
       ratingEl.replaceChildren(el('span', { class: 'muted', text: 'No reviews yet' }));
     } else {
@@ -226,8 +232,19 @@ function start() {
       : [el('li', { class: 'muted', text: 'No busy-hour reports yet.' })]));
   }
 
-  function reviewCard(review) {
+    function reviewCard(review) {
+    const actionButton = review.is_mine
+      ? el('button', {
+          class: 'btn btn-danger btn-small', type: 'button', text: 'Delete my review',
+          onclick: () => deleteMine(review, actionButton)
+        })
+      : el('button', {
+          class: 'btn btn-secondary btn-small', type: 'button', text: 'Report',
+          onclick: () => openReport(review.id)
+        });
+
     return el('article', { class: 'card' },
+      review.is_mine && el('span', { class: 'badge badge-ok', text: 'Your review' }),
       el('div', { class: 'row', style: 'justify-content: space-between; align-items: center;' },
         el('span', {
           class: 'stars', role: 'img',
@@ -243,11 +260,21 @@ function start() {
         class: 'review-photo', src: review.photo_url,
         alt: 'Photo shared with this review', loading: 'lazy'
       }),
-      el('div', { style: 'margin-top: 0.5rem;' },
-        el('button', {
-          class: 'btn btn-secondary btn-small', type: 'button', text: 'Report',
-          onclick: () => openReport(review.id)
-        })));
+      el('div', { style: 'margin-top: 0.5rem;' }, actionButton));
+  }
+
+  async function deleteMine(review, button) {
+    if (!window.confirm('Delete your review? This cannot be undone.')) return;
+    clearMessage();
+    await withBusy(button, async () => {
+      try {
+        await api.deleteReview(review.id);
+        await Promise.all([loadGym(), loadReviews(true)]);
+        showSuccess('Your review was deleted.');
+      } catch (error) {
+        showError(error.message);
+      }
+    });
   }
 
   async function loadReviews(reset) {

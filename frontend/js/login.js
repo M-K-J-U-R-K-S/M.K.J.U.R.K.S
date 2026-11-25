@@ -5,6 +5,13 @@ const HOME_PAGE = 'index.html';
 // Already logged in? Skip this page.
 if (isLoggedIn()) window.location.href = HOME_PAGE;
 
+
+// Sent here because the session ended (for example, it expired)
+if (new URLSearchParams(window.location.search).get('reason') === 'expired') {
+  showError('Your session ended, so you were signed out. Please log in again.');
+  window.history.replaceState(null, '', 'login.html'); // so a refresh doesn't show it again
+}
+
 const loginForm = document.getElementById('login-form');
 const registerForm = document.getElementById('register-form');
 const showLoginButton = document.getElementById('show-login');

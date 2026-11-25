@@ -1,6 +1,6 @@
 import {
   api, requireLogin, renderNavbar, el,
-  showError, clearMessage, withBusy, starText
+  showError, clearMessage, withBusy, starText, safeWebsite
 } from './common.js?v=merged-5';
 
 if (requireLogin()) {
@@ -24,31 +24,38 @@ function start() {
     return `gym-detail.html?id=${encodeURIComponent(gym.id)}`;
   }
 
-  function gymCard(gym) {
-    const rating = gym.average_rating;
-    const reviews = gym.review_count;
+ function gymCard(gym) {
+  const rating = gym.average_rating;
+  const reviews = gym.review_count;
+  const website = safeWebsite(gym.website);
 
-    const ratingLine = rating === null || rating === undefined
-      ? el('p', { class: 'muted', text: 'No reviews yet' })
-      : el('p', {},
-          el('span', {
-            class: 'stars', role: 'img',
-            'aria-label': `Rated ${Number(rating).toFixed(1)} out of 5`,
-            text: starText(rating)
-          }),
-          el('span', {
-            class: 'muted small',
-            text: ` (${reviews} review${reviews === 1 ? '' : 's'})`
-          }));
+  const ratingLine = rating === null || rating === undefined
+    ? el('p', { class: 'muted', text: 'No reviews yet' })
+    : el('p', {},
+        el('span', {
+          class: 'stars', role: 'img',
+          'aria-label': `Rated ${Number(rating).toFixed(1)} out of 5`,
+          text: starText(rating)
+        }),
+        el('span', {
+          class: 'muted small',
+          text: ` (${reviews} review${reviews === 1 ? '' : 's'})`
+        }));
 
-    return el('article', { class: 'card' },
-      el('h3', {}, el('a', { href: gymLink(gym), text: gym.name })),
-      el('p', { class: 'muted small', text: gym.address || 'Address not listed' }),
-      ratingLine,
-      gym.distance_km != null &&
-        el('p', { class: 'small', text: `${(gym.distance_km * 0.621371).toFixed(1)} miles away` }),
-      el('a', { class: 'btn btn-secondary btn-small', href: gymLink(gym), text: 'View gym' }));
-  }
+  return el('article', { class: 'card' },
+    el('h3', {}, el('a', { href: gymLink(gym), text: gym.name })),
+    el('p', { class: 'muted small', text: gym.address || 'Address not listed' }),
+    ratingLine,
+    gym.distance_km != null &&
+      el('p', { class: 'small', text: `${(gym.distance_km * 0.621371).toFixed(1)} miles away` }),
+    website && el('p', { class: 'small' }, el('a', {
+      href: website, target: '_blank', rel: 'noopener noreferrer', text: 'Website ↗',
+      'aria-label': `${gym.name} website (opens in a new tab)`
+    })),
+    el('a', { class: 'btn btn-secondary btn-small', href: gymLink(gym), text: 'View gym' })
+  );
+}
+
 
   function renderGyms(gyms) {
     results.replaceChildren();

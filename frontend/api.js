@@ -13,7 +13,9 @@ export function createApi({ baseUrl = 'http://127.0.0.1:8000', storage = globalT
     });
     const data = response.status === 204 ? null : await response.json();
     if (!response.ok) {
-      if (response.status === 401) { storage.removeItem(key); onUnauthorized(); }
+      // A wrong password on the login form is not an expired session. Stay on the page so the message shows.
+      const isAuthAttempt = path === '/api/auth/login' || path === '/api/auth/register';
+      if (response.status === 401 && !isAuthAttempt) { storage.removeItem(key); onUnauthorized(); }
       const error = new Error(data?.error || 'Request failed');
       error.status = response.status;
       throw error;
@@ -51,6 +53,8 @@ export function createApi({ baseUrl = 'http://127.0.0.1:8000', storage = globalT
     updateEquipment: (gymId, body) => request(`/api/gyms/${id(gymId)}/equipment`, { method: 'POST', body }),
     reviews: (gymId, filters) => request(`/api/gyms/${id(gymId)}/reviews` + query(filters)),
     addReview: (gymId, body) => request(`/api/gyms/${id(gymId)}/reviews`, { method: 'POST', body }),
+    myReviews: filters => request('/api/users/me/reviews' + query(filters)),
+    deleteReview: reviewId => request(`/api/reviews/${id(reviewId)}`, { method: 'DELETE' }),
     reportReview: (reviewId, reason) => request(`/api/reviews/${id(reviewId)}/reports`, { method: 'POST', body: { reason } }),
     uploadPhoto: file => { const body = new FormData(); body.append('file', file); return request('/api/reviews/photo', { method: 'POST', body }); },
     workoutLogs: filters => request('/api/users/me/workout-logs' + query(filters)),
@@ -74,3 +78,4 @@ export function createApi({ baseUrl = 'http://127.0.0.1:8000', storage = globalT
     deleteCalorieLog: entryId => request(`/api/calorie-logs/${id(entryId)}`, { method: 'DELETE' })
   };
 }
+

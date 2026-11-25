@@ -8,7 +8,7 @@ export const api = createApi({
     baseUrl: ['127.0.0.1', 'localhost'].includes(window.location.hostname)
     ? 'http://127.0.0.1:8000'
     : 'https://pump-check-api.onrender.com',
-  onUnauthorized: () => { window.location.href = LOGIN_PAGE; }
+  onUnauthorized: () => { window.location.href = `${LOGIN_PAGE}?reason=expired`; }
 });
 
 export function isLoggedIn() {
@@ -73,6 +73,18 @@ export async function withBusy(button, task) {
   }
 }
 
+
+export function safeWebsite(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+
+
 export function starText(rating) {
   if (rating === null || rating === undefined) return 'No reviews yet';
   const value = Number(rating);
@@ -95,7 +107,8 @@ const LINKS = [
   ['plans.html', 'My Plans'],
   ['calories.html', 'Calories'],
   ['community.html', 'Community'],
-  ['account.html', 'Account']
+  ['account.html', 'Account'],
+  ['my-reviews.html', 'My Reviews']
 ];
 
 /**
