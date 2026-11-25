@@ -14,3 +14,4 @@ class Gym(Base):
     address = Column(Text)
     latitude = Column(Numeric)
     longitude = Column(Numeric)
+    website = Column(Text)

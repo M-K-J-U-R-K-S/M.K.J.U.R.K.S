@@ -10,11 +10,11 @@ import warnings
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app import config, integrations
-from app.api_schemas import EquipmentList, EquipmentItem, ReviewsList, ReviewCreated, ReportCreated, PhotoCreated
+from app.api_schemas import EquipmentList, EquipmentItem, ReviewsList, ReviewCreated, ReportCreated, PhotoCreated, MyReviewsList
 from app.auth import get_access_token, get_current_user, get_profile
 from app.community import normalize
 from app.database import get_db
@@ -86,14 +86,14 @@ def photo_url(path):
     return f"{config.SUPABASE_URL.rstrip('/')}/storage/v1/object/public/{config.REVIEW_PHOTO_BUCKET}/{path}"
 
 
-def review_item(review, username):
+def review_item(review, username, mine=False):
     created = review.created_at
     if created and created.tzinfo is None:
         created = created.replace(tzinfo=timezone.utc)
     return {"id": review.id, "user_id": review.user_id, "username": username,
             "gym_id": review.gym_id, "rating": review.rating, "review_text": review.review_text,
             "busy_hour_info": review.busy_hour_info, "photo_url": photo_url(review.photo_path),
-            "created_at": created}
+            "created_at": created, "is_mine": mine}
 
 
 class ReviewRequest(BaseModel):
@@ -114,11 +114,50 @@ def storage_headers(token):
 def list_reviews(gym_id: UUID, limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0),
                  identity: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     require_gym(db, gym_id)
+    profile = get_profile(identity, db)
     total = db.scalar(select(func.count(GymReview.id)).where(GymReview.gym_id == gym_id))
+    mine_first = case((GymReview.user_id == profile.id, 0), else_=1)  # your own reviews come first
     rows = db.execute(select(GymReview, User.username).join(User, User.id == GymReview.user_id)
-                      .where(GymReview.gym_id == gym_id).order_by(GymReview.created_at.desc(), GymReview.id.desc())
+                      .where(GymReview.gym_id == gym_id)
+                      .order_by(mine_first, GymReview.created_at.desc(), GymReview.id.desc())
                       .limit(limit).offset(offset)).all()
-    return {"reviews": [review_item(*row) for row in rows], "total": total}
+    return {"reviews": [review_item(review, username, review.user_id == profile.id)
+                        for review, username in rows], "total": total}
+
+
+@router.get("/api/users/me/reviews", response_model=MyReviewsList)
+def my_reviews(limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0),
+               identity: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    profile = get_profile(identity, db)
+    total = db.scalar(select(func.count(GymReview.id)).where(GymReview.user_id == profile.id))
+    rows = db.execute(select(GymReview, Gym.name).join(Gym, Gym.id == GymReview.gym_id)
+                      .where(GymReview.user_id == profile.id)
+                      .order_by(GymReview.created_at.desc(), GymReview.id.desc())
+                      .limit(limit).offset(offset)).all()
+    return {"reviews": [{**review_item(review, profile.username, True), "gym_name": gym_name}
+                        for review, gym_name in rows], "total": total}
+
+
+@router.delete("/api/reviews/{review_id}", status_code=204)
+def delete_review(review_id: UUID, identity: dict = Depends(get_current_user),
+                  token: str = Depends(get_access_token), db: Session = Depends(get_db)):
+    review = db.get(GymReview, review_id)
+    if review is None:
+        raise HTTPException(404, "Review not found")
+    profile = get_profile(identity, db)
+    if review.user_id != profile.id:
+        raise HTTPException(403, "You can only delete your own reviews")
+    photo_path = review.photo_path
+    db.delete(review)
+    db.commit()
+    if photo_path:
+        # Best effort: the review is already gone even if the photo file cannot be removed.
+        try:
+            integrations.request("DELETE", f"{config.SUPABASE_URL}/storage/v1/object/"
+                                 f"{config.REVIEW_PHOTO_BUCKET}/{photo_path}", "Photo storage",
+                                 headers=storage_headers(token))
+        except HTTPException:
+            pass
 
 
 @router.post("/api/gyms/{gym_id}/reviews", status_code=201, response_model=ReviewCreated)

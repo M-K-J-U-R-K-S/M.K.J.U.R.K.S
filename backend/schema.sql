@@ -10,7 +10,8 @@ create table gyms (
   name text not null,
   address text,
   latitude decimal,
-  longitude decimal
+  longitude decimal,
+  website text
 );
 
 create table equipment (

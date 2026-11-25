@@ -20,6 +20,7 @@ class GymSummary(BaseModel):
     address: str | None = None
     latitude: float | None = None
     longitude: float | None = None
+    website: str | None = None
     average_rating: float | None = None
     review_count: int = 0
     distance_km: float | None = None
@@ -54,6 +55,7 @@ def to_summary(gym, avg_rating, review_count) -> dict:
         "address": gym.address,
         "latitude": float(gym.latitude) if gym.latitude is not None else None,
         "longitude": float(gym.longitude) if gym.longitude is not None else None,
+        "website": gym.website,
         "average_rating": float(avg_rating) if avg_rating is not None else None,
         "review_count": review_count,
     }

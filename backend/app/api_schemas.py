@@ -39,6 +39,7 @@ class ReviewItem(BaseModel):
     busy_hour_info: str | None
     photo_url: str | None
     created_at: datetime
+    is_mine: bool = False
 
 
 class ReviewCreated(ReviewItem):
@@ -47,6 +48,15 @@ class ReviewCreated(ReviewItem):
 
 class ReviewsList(BaseModel):
     reviews: list[ReviewItem]
+    total: int
+
+
+class MyReview(ReviewItem):
+    gym_name: str
+
+
+class MyReviewsList(BaseModel):
+    reviews: list[MyReview]
     total: int
 
 
